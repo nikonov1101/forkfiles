@@ -1,0 +1,100 @@
+forkfiles
+=========
+
+my second attempt to manage dotfiles in the sane way;
+
+the idea is: each of my machines is unique enough, and they often becomes
+multi-functional in the unpredictable way, so it worth to set up them by hand,
+instead of using ansible, or any other sorts of automation.
+
+...but, at the same time, all of my machines shares the configuration of most
+important things, like shell with all use aliases, tmux with all the
+keybindings, email program with all the rules; do you have a .bashrc that you
+occasionally carry around for the last nine years? that kind of stuff.
+
+my previous attempt ended up in a messy repository with files like:
+- zshrc-desktop
+- zshrc-server1
+- zshrc-server-work
+- zshrv-laptop
+- ssh-config-home
+- ssh-config-work
+- ...
+
+...and lovely ./collect.sh script of the time, which routinely trashes the
+content of shared-but-not-exactly files which was hacked a bit here and there to
+fit the purposes of the particular system; so i was looking for something easy
+to deploy, but difficult to fuck-up dramatically, on both git, and file-system
+levels; so i came up with some thesises aka rules to organize your stuff around:
+
+- all machines have "shared" and "local" (machine-specific) configuration;
+
+- "shared" configuration, such as tmux config, shell aliases, git config, must
+be collected under the well-known directory named "_config/";
+
+- if a participant wants to use the shared configuration file on their system,
+they must make a symlink to a place where the configuration file expected to be,
+e.g: ln -s _config/tmux.conf $HOME/.tmux.conf
+
+- if participant find a better way to do things with, say, tmux, and wants to
+contribute such a wisdom back, they might edit the config files where expected,
+and then commit changes to the original file in the "_shares/" as well as their
+own "local" files;
+
+- each machine has its own dedicated directory for the "local" configuration,
+named after the machine's `hostname -s`;
+
+- what to backup from a particular machine is described in "$hostname/_list"
+file, one line per file or directory, "~" is expanded;
+
+- the "local" directory follows the machine's filesystem structure: if we backup
+/etc/ssh/sshd_config, we backup it into $hostname/etc/ssh/sshd_config;
+
+
+following these rules, it is almost impossible to have git conflicts, since each
+machine whites files to its own directory, and shared configuration does not
+have a lot of tendency to change over time.
+
+the repository itself contains a makefile, and a short script to copy files;
+one could read both of these files, fully, in the order of one minute, so no
+following comments are given on a technical aspects. because it is _that_ simple.
+
+in exchange of its extreme simplicity, there is one **huge inconvenience:** you
+have to manage a list of things to backup: maintain a content of the
+"$hostname/_list" file, that contains a list of things to copy from this
+particular system. but isn't it a good, concious way of managing things,
+especially when there are few of them?
+
+some practical aspects:
+
++ i run gitea over tailscale, so enrolling new hosts is super simple: i just
+"git clone" over plain http over tailscale; "git push" via http over tailscale,
+too; because i am okay with typing simple, me-and-my-friends-lan-grade username
+and password, just as an indication of the ongoing "write" operation.
+
++ since the file structure is very file-conflict-prone, it's just about fine to
+ssh into a host once in a ~5 months, do "git pull; make; git commit -m
+"$hostname: regular update"; git push; exit" for another many more months;
+
++ zsh config split into the two parts: "shared" part with configuration and
+aliases, which imports the "local" part, with a machine specific settings;
+
++ you don't forced to install a lot of software to "unify" environments:
+you need only git, make, and a text editor on a target machine;
+
++ for a practical reasons, there is also a "_scripts" directory, i consider it as
+a portable "/usr/local/bin/", and have it in my $PATH; the following categories
+of files have a tendency to be put in this directory:
+      (1) it make sense to have this script on all/most of your machines,
+          e.g: tmux-sessionizer, backup.zsh, etc; and,
+      (2) the script meant to be used on a single machine, but MUST be
+          under the version control: part of desktop manager (volume,
+          backlight, notifications, dmenu, motd, etc, etc)
+      (3) the script supposed to be running outside of interactive shell
+          session, so there is no way to implement these as zsh
+          functions, e.g: cron jobs, aerc bindings, etc.
+
+the rest of the repository is meant to be filled with host-related directories
+(made with "make enroll" command) named after a hostname of a particular
+machine.
+
